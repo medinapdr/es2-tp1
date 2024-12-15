@@ -84,6 +84,29 @@ class CartaFeitico(Carta):
             for criatura in jogador_adversario.campo_de_batalha[:]:
                 criatura.sofrer_dano(self.poder, jogador_adversario) 
         return True
+    
+class CartaFeiticoRevive(CartaFeitico):
+    """Representa um feitiço que revive uma criatura do cemitério."""
+    def __init__(self, nome: str, custo_mana: int, descricao: str):
+        super().__init__(nome, custo_mana, descricao, tipo_magia="revive", poder=0, tem_alvo=False, afeta_todos=False)
+
+    def lancar(self, lancador, alvo=None, jogador_adversario=None):
+        """Lança o feitiço de reviver criatura."""
+        if lancador.mana < self.custo_mana:
+            print(f"Mana insuficiente para lançar {self.nome}.")
+            return False
+        lancador.mana -= self.custo_mana
+        criaturas_no_cemiterio = [c for c in lancador.cemiterio if isinstance(c, CartaCriatura)]
+        if criaturas_no_cemiterio:
+            criatura_para_revivir = random.choice(criaturas_no_cemiterio)
+            lancador.cemiterio.remove(criatura_para_revivir)
+            lancador.campo_de_batalha.append(criatura_para_revivir)
+            print(f"{lancador.nome} reviveu {criatura_para_revivir.nome} do cemitério!")
+        else:
+            print(f"{lancador.nome} tentou reviver uma criatura, mas não há nenhuma no cemitério.")
+
+        # O feitiço após ser lançado é consumido, será movido para o cemitério em jogar_carta
+        return True
 
 class Jogador:
     """Representa um jogador no jogo."""
@@ -116,7 +139,7 @@ class Jogador:
         else:
             return carta.nome
 
-    def jogar_carta(self, indice_carta: int, alvo=None, jogador_alvo=None):
+    def jogar_carta(self, indice_carta: int, alvo=None, jogador_alvo=None, jogo=None):
         """Joga uma carta da mão."""
         if indice_carta < 0 or indice_carta >= len(self.mao):
             print("Índice de carta inválido.")
@@ -129,20 +152,21 @@ class Jogador:
                 self.mao.pop(indice_carta)
                 print(f"{self.nome} jogou {carta.nome}.")
                 if jogo:
-                    jogo.historico.append(f"{self.nome}: Jogou {self.descricao_carta_para_historico(carta)}")
+                    jogo.historico.append(f"Rodada {jogo.turno + 1} - {self.nome}: Jogou {self.descricao_carta_para_historico(carta)}")
                 return True
             else:
                 print(f"Mana insuficiente para jogar {carta.nome}.")
+
         elif isinstance(carta, CartaFeitico):
             if carta.lancar(self, alvo, jogador_alvo):
                 self.cemiterio.append(self.mao.pop(indice_carta))
                 print(f"{self.nome} lançou {carta.nome}.")
                 if jogo:
-                    jogo.historico.append(f"{self.nome}: Usou {self.descricao_carta_para_historico(carta)}")
+                    jogo.historico.append(f"Rodada {jogo.turno + 1} - {self.nome}: Usou {self.descricao_carta_para_historico(carta)}")
                 return True
         return False
 
-    def atacar(self, jogador_alvo, indice_atacante: int, indice_alvo: Optional[int] = None):
+    def atacar(self, jogador_alvo, indice_atacante: int, indice_alvo: Optional[int] = None, jogo=None):
         """Ataca o jogador alvo ou suas criaturas com uma criatura."""
         
         # Verificação do índice do atacante
@@ -157,10 +181,11 @@ class Jogador:
             # Se o jogador alvo não tiver criaturas, ataca a saúde diretamente
             if not jogador_alvo.campo_de_batalha:
                 print(f"{self.nome}'s {atacante.nome} ataca {jogador_alvo.nome} diretamente.")
+                time.sleep(2)
                 jogador_alvo.receber_dano(atacante.poder)
                 if jogo:
                     jogo.historico.append(
-                        f"{self.nome}: {atacante.nome}(P:{atacante.poder},R:{atacante.resistencia}) atacou diretamente {jogador_alvo.nome}")
+                        f"Rodada {jogo.turno + 1} - {self.nome}: {atacante.nome}(P:{atacante.poder},R:{atacante.resistencia}) atacou diretamente {jogador_alvo.nome}")
                 return
             
             # Caso o jogador alvo tenha criaturas, verifica o índice de alvo
@@ -187,7 +212,7 @@ class Jogador:
 
             if jogo:
                 jogo.historico.append(
-                    f"{self.nome}: {atacante.nome}(P:{atacante.poder},R:{atacante.resistencia}) atacou {criatura_alvo.nome}(P:{criatura_alvo.poder},R:{criatura_alvo.resistencia + atacante.poder})"
+                    f"Rodada {jogo.turno + 1} - {self.nome}: {atacante.nome}(P:{atacante.poder},R:{atacante.resistencia}) atacou {criatura_alvo.nome}(P:{criatura_alvo.poder},R:{criatura_alvo.resistencia + atacante.poder})"
                 )
 
     def receber_dano(self, quantidade: int):
@@ -195,7 +220,7 @@ class Jogador:
         self.saude -= quantidade
         print(f"{self.nome} recebe {quantidade} de dano. Saúde restante: {self.saude}")
 
-    def escolher_acao(self, jogador_alvo: 'Jogador'):
+    def escolher_acao(self, jogador_alvo: 'Jogador', jogo: 'Jogo'):
         """Escolhe uma ação para o jogador."""
         def exibir_tabuleiro():
             print("\n--- TABULEIRO DO JOGO ---")
@@ -224,7 +249,7 @@ class Jogador:
         if self.eh_humano:
             print(f"\n{self.nome}, é a sua vez!")
             while True:
-                acao = input("Escolha uma ação: (1) Jogar carta, (2) Atacar com Criatura, (3) Passar a vez, (4) Histórico: ")
+                acao = input("Escolha uma ação: (1) Jogar carta, (2) Atacar com Criatura, (3) Passar a vez, (4) Histórico, (5) Encerrar: ")
 
                 if acao == "1":
                     if not self.mao:
@@ -258,20 +283,20 @@ class Jogador:
                         else:
                             print(f"{jogador_alvo.nome} não tem criaturas. Atacando o jogador diretamente.")
                             alvo = jogador_alvo
-                        if self.jogar_carta(índice_carta, alvo, jogador_alvo):
+                        if self.jogar_carta(índice_carta, alvo, jogador_alvo, jogo):
                             break
                         else:
                             print("Não foi possível jogar a carta. Mana insuficiente. Tente outra ação.")
                             continue
 
                     elif isinstance(carta, CartaFeitico) and carta.tipo_magia == "dano_direto":
-                        if self.jogar_carta(índice_carta, jogador_alvo):
+                        if self.jogar_carta(índice_carta, jogador_alvo, jogo=jogo):
                             break
                         else:
                             print("Não foi possível jogar carta. Mana insuficiente")
                             continue
                     else:
-                        if self.jogar_carta(índice_carta, jogador_alvo=jogador_alvo):
+                        if self.jogar_carta(índice_carta, jogador_alvo=jogador_alvo, jogo=jogo):
                             break
                         else:
                             print("Não foi possível jogar carta. Mana insuficiente")
@@ -292,7 +317,7 @@ class Jogador:
                         if indice_atacante < 0 or indice_atacante >= len(self.campo_de_batalha):
                             print("Índice de criatura atacante inválido.")
                             continue
-                        self.atacar(jogador_alvo, indice_atacante)  # Ataca diretamente a saúde do adversário
+                        self.atacar(jogador_alvo, indice_atacante, jogo=jogo)  # Ataca diretamente a saúde do adversário
                         break
                     else:
                         try:
@@ -308,12 +333,12 @@ class Jogador:
                         if indice_alvo < 0 or indice_alvo >= len(jogador_alvo.campo_de_batalha):
                             print("Índice de criatura alvo inválido.")
                             continue
-                        self.atacar(jogador_alvo, indice_atacante, indice_alvo)
+                        self.atacar(jogador_alvo, indice_atacante, indice_alvo, jogo=jogo)
                         break
 
                 elif acao == "3":
                     print("Passando a vez.")
-                    jogo.historico.append(f"{self.nome}: Passou a vez")
+                    jogo.historico.append(f"Rodada {jogo.turno + 1} - {self.nome} passou a vez.")
                     break
 
                 elif acao == "4":
@@ -325,39 +350,74 @@ class Jogador:
                     # Não sai do turno, apenas mostra o histórico e pede outra ação.
                     continue
 
+                elif acao == "5":
+                    # Encerrar o jogo
+                    print("Encerrando o jogo...")
+                    jogo.encerrar_jogo = True
+                    break
                 else:
                     print("Ação inválida. Por favor escolha novamente")
+
         else:
             print(f"{self.nome} está escolhendo uma ação...")
             time.sleep(2)
 
-            # Jogar uma carta se possível
-            jogou_carta = False
+            # Se a saúde da IA estiver baixa, prioriza cura (se possível)
+            if self.saude < 10:
+                for i, carta in  enumerate(self.mao):
+                    if carta.custo_mana <= self.mana and isinstance(carta, CartaFeitico) and carta.tipo_magia == "cura":
+                        print(f"{self.nome} decidiu se curar jogando {carta.nome}")
+                        time.sleep(2)
+                        self.jogar_carta(i, jogo=jogo)
+                        return 
+            
+            # Se o oponente tem criaturas fortes, tenta usar dano primeiro
+            if jogador_alvo.campo_de_batalha:
+                for i, carta in enumerate(self.mao):
+                    if carta.custo_mana <= self.mana and isinstance(carta, CartaFeitico) and (carta.tipo_magia == "dano_unico" or carta.tipo_magia == "dano_coletivo"):
+                    # Escolhe o alvo mais fraco para garantir morte (se tiver alvo)
+                        if carta.tem_alvo and jogador_alvo.campo_de_batalha:
+                        # Escolhe a criatura com menor resistência
+                            criatura_alvo = min(jogador_alvo.campo_de_batalha, key=lambda c: c.resistencia)
+                            indice_alvo = jogador_alvo.campo_de_batalha.index(criatura_alvo)
+                            print(f"{self.nome} usa {carta.nome} na criatura inimiga {criatura_alvo.nome}")
+                            time.sleep(2)
+                            self.jogar_carta(i, alvo=criatura_alvo, jogador_alvo=jogador_alvo, jogo=jogo)
+                        else:
+                            # Se não tem alvo específico (dano_coletivo), só lança
+                            print(f"{self.nome} usa {carta.nome} para danificar o campo inimigo.")
+                            time.sleep(2)
+                            self.jogar_carta(i, jogador_alvo=jogador_alvo, jogo=jogo)
+                        return
+                    
+             # Caso não tenha prioridades especiais, joga a primeira criatura que puder
             for i, carta in enumerate(self.mao):
-                if carta.custo_mana <= self.mana:
-                    print(f"{self.nome} decidiu jogar a carta {carta.nome}")
+                if carta.custo_mana <= self.mana and isinstance(carta, CartaCriatura):
+                    print(f"{self.nome} decide invocar a criatura {carta.nome}")
                     time.sleep(2)
-                    self.jogar_carta(i)
-                    jogou_carta = True
+                    self.jogar_carta(i, jogo=jogo)
                     return
-
-            if not jogou_carta:
-                # Atacar se houver criaturas no campo de batalha
-                if self.campo_de_batalha:
-                    print(f"{self.nome} decide atacar.")
-                    time.sleep(2)
-                    indice_atacante = random.randint(0, len(self.campo_de_batalha) - 1)
-                    if jogador_alvo.campo_de_batalha:
-                        # Se o oponente tem criaturas, escolhe uma aleatória para atacar
-                        indice_alvo = random.randint(0, len(jogador_alvo.campo_de_batalha) - 1)
-                        self.atacar(jogador_alvo, indice_atacante, indice_alvo)
-                    else:
-                        # Se não tiver criaturas, ataca o jogador diretamente
-                        self.atacar(jogador_alvo, indice_atacante)
+            
+            # Se não conseguiu jogar nada, ataca se tiver criaturas
+            if self.campo_de_batalha:
+                print(f"{self.nome} decide atacar.")
+                time.sleep(2)
+                # Tenta atacar a criatura com menor resistência do oponente, senão o jogador
+                if jogador_alvo.campo_de_batalha:
+                    criatura_alvo = min(jogador_alvo.campo_de_batalha, key=lambda c: c.resistencia)
+                    indice_alvo = jogador_alvo.campo_de_batalha.index(criatura_alvo)
+                    indice_atacante = 0  # Ataca com a primeira criatura
+                    self.atacar(jogador_alvo, indice_atacante, indice_alvo, jogo=jogo)
                 else:
-                    print(f"{self.nome} não jogou cartas e nem atacou. Passando a vez...")
-                    jogo.historico.append(f"{self.nome}: Passou a vez")
-                    time.sleep(2)
+                    # Ataca diretamente o jogador
+                    indice_atacante = 0
+                    self.atacar(jogador_alvo, indice_atacante, jogo=jogo)
+
+            else:
+                # Se não tem criaturas no campo e não pode jogar nada
+                print(f"{self.nome} não jogou cartas e nem atacou. Passando a vez...")
+                jogo.historico.append(f"Rodada {jogo.turno + 1} - {self.nome}: passou a vez")
+                time.sleep(2)
 
     def __str__(self):
         return f"Jogador {self.nome}: Saúde = {self.saude}, Mana = {self.mana}, Mão = {len(self.mao)}, Campo de Batalha = {len(self.campo_de_batalha)}"
@@ -368,6 +428,7 @@ class Jogo:
         self.jogadores = jogadores
         self.turno = 0
         self.historico: List[str] = []
+        self.encerrar_jogo = False
 
     def iniciar(self):
         """Inicia o jogo."""
@@ -379,27 +440,34 @@ class Jogo:
 
     def jogar_turno(self):
         """Joga um turno do jogo."""
+        if self.encerrar_jogo: 
+            return False
         limpar_tela()
+        rodada_atual = self.turno + 1
         jogador_atual = self.jogadores[self.turno % len(self.jogadores)]
-        print(f"\nÉ a vez de {jogador_atual.nome}!")
+        print(f"\nRodada número {rodada_atual}.\nÉ a vez de {jogador_atual.nome}!")
         jogador_atual.mana += 1
         print(f"{jogador_atual.nome} ganha 1 mana. Mana total: {jogador_atual.mana}")
         jogador_atual.comprar_carta()
 
         # Ação do jogador
         jogador_alvo = self.jogadores[(self.turno + 1) % len(self.jogadores)]
-        jogador_atual.escolher_acao(jogador_alvo)
+        jogador_atual.escolher_acao(jogador_alvo, self)
+
+        if self.encerrar_jogo:
+            return False
 
         # Verificar se algum jogador perdeu
         if jogador_alvo.saude <= 0:
             print(f"{jogador_alvo.nome} foi derrotado!")
-            self.historico.append(f"{jogador_alvo.nome} foi derrotado!")
+            self.historico.append(f"Rodada {rodada_atual}: {jogador_alvo.nome} foi derrotado!")
             self.jogadores.remove(jogador_alvo)
 
         self.turno += 1
         if len(self.jogadores) == 1:
-            print(f"{self.jogadores[0].nome} é o vencedor!")
-            self.historico.append(f"{self.jogadores[0].nome} é o vencedor!")
+            vencedor = self.jogadores[0].nome
+            print(f"{vencedor} é o vencedor!")
+            self.historico.append(f"Rodada {rodada_atual}: {vencedor} é o vencedor!")
             return False
         return True
     
@@ -423,6 +491,8 @@ cartas = [
     CartaFeitico("Cura Menor", 1, "Restaura 2 de saúde.", "cura", 2),
     CartaFeitico("Cura Média", 3, "Restaura 5 de saúde.", "cura", 5),
     CartaFeitico("Cura Superior", 5, "Restaura 10 de saúde.", "cura", 10),
+
+    CartaFeiticoRevive("Necromante Sombrio", 0, "Revive uma criatura aleatória do cemitério.")
 ]
 
 jogador1 = Jogador("Jogador", eh_humano=True)
