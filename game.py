@@ -100,6 +100,8 @@ class CartaFeiticoRevive(CartaFeitico):
         if criaturas_no_cemiterio:
             criatura_para_revivir = random.choice(criaturas_no_cemiterio)
             lancador.cemiterio.remove(criatura_para_revivir)
+            resistencia_original = CRIATURAS_DISPONIVEIS.get(criatura_para_revivir.nome, criatura_para_revivir.resistencia)
+            criatura_para_revivir.resistencia = resistencia_original
             lancador.campo_de_batalha.append(criatura_para_revivir)
             print(f"{lancador.nome} reviveu {criatura_para_revivir.nome} do cemitério!")
         else:
@@ -145,6 +147,9 @@ class Jogador:
             print("Índice de carta inválido.")
             return False
         carta = self.mao[indice_carta]
+        if isinstance(carta, CartaFeiticoRevive) and not self.cemiterio:
+            print(f"Não é possível utilizar {carta.nome} pois o cemitério está vazio!")
+            return False
         if isinstance(carta, CartaCriatura):
             if self.mana >= carta.custo_mana:
                 self.mana -= carta.custo_mana
@@ -220,6 +225,16 @@ class Jogador:
         self.saude -= quantidade
         print(f"{self.nome} recebe {quantidade} de dano. Saúde restante: {self.saude}")
 
+    def mostrar_cemiterio(self):
+        """Exibe todas as cartas no cemitério do jogador."""
+        if not self.cemiterio:
+            print(f"O cemitério de {self.nome} está vazio.")
+        else:
+            print(f"\n--- Cemitério de {self.nome} ---")
+            for i, carta in enumerate(self.cemiterio):
+                print(f"[{i}] {carta}")
+            print("------------------------------")
+
     def escolher_acao(self, jogador_alvo: 'Jogador', jogo: 'Jogo'):
         """Escolhe uma ação para o jogador."""
         def exibir_tabuleiro():
@@ -236,7 +251,7 @@ class Jogador:
             for jogador in [self, jogador_alvo]:
                 cor = Fore.BLUE if jogador == self else Fore.RED
                 print(f"{cor}{jogador.nome} - Saúde: {jogador.saude}, Mana: {jogador.mana}")
-                if jogador == self:
+                if jogador.eh_humano:
                     print("Mão:")
                     for i, carta in enumerate(jogador.mao):
                         print(f"  [{i}] {carta}")
@@ -249,7 +264,7 @@ class Jogador:
         if self.eh_humano:
             print(f"\n{self.nome}, é a sua vez!")
             while True:
-                acao = input("Escolha uma ação: (1) Jogar carta, (2) Atacar com Criatura, (3) Passar a vez, (4) Histórico, (5) Encerrar: ")
+                acao = input("Escolha uma ação: (1) Jogar carta, (2) Atacar com Criatura, (3) Passar a vez, (4) Histórico, (5) Mostrar cemitério, (6) Encerrar: ")
 
                 if acao == "1":
                     if not self.mao:
@@ -272,34 +287,34 @@ class Jogador:
                             for i, criatura in enumerate(jogador_alvo.campo_de_batalha):
                                 print(f"  [{i}] {criatura}")
                             try:
-                                índice_alvo = int(input("Escolha o índice da criatura alvo: "))
+                                indice_alvo = int(input("Escolha o índice da criatura alvo: "))
                             except ValueError:
                                 print("Índice inválido.")
                                 continue
-                            if índice_alvo < 0 or indice_alvo >= len(jogador_alvo.campo_de_batalha):
+                            if indice_alvo < 0 or indice_alvo >= len(jogador_alvo.campo_de_batalha):
                                 print("Índice de criatura alvo inválido.")
                                 continue
-                            alvo = jogador_alvo.campo_de_batalha[índice_alvo]
+                            alvo = jogador_alvo.campo_de_batalha[indice_alvo]
                         else:
                             print(f"{jogador_alvo.nome} não tem criaturas. Atacando o jogador diretamente.")
                             alvo = jogador_alvo
                         if self.jogar_carta(índice_carta, alvo, jogador_alvo, jogo):
                             break
                         else:
-                            print("Não foi possível jogar a carta. Mana insuficiente. Tente outra ação.")
+                            print("Tente outra ação.")
                             continue
 
                     elif isinstance(carta, CartaFeitico) and carta.tipo_magia == "dano_direto":
                         if self.jogar_carta(índice_carta, jogador_alvo, jogo=jogo):
                             break
                         else:
-                            print("Não foi possível jogar carta. Mana insuficiente")
+                            print("Tente outra ação")
                             continue
                     else:
                         if self.jogar_carta(índice_carta, jogador_alvo=jogador_alvo, jogo=jogo):
                             break
                         else:
-                            print("Não foi possível jogar carta. Mana insuficiente")
+                            print("Tente outra ação")
                             continue
 
                 elif acao == "2":
@@ -351,6 +366,9 @@ class Jogador:
                     continue
 
                 elif acao == "5":
+                    self.mostrar_cemiterio()
+
+                elif acao == "6":
                     # Encerrar o jogo
                     print("Encerrando o jogo...")
                     jogo.encerrar_jogo = True
@@ -494,6 +512,21 @@ cartas = [
 
     CartaFeiticoRevive("Necromante Sombrio", 0, "Revive uma criatura aleatória do cemitério.")
 ]
+
+# Tabela de referência para as resistências originais das criaturas
+CRIATURAS_DISPONIVEIS = {
+    "Guerreiro Esquelético": 1,
+    "Esqueleto Gigante": 5,
+    "Zumbi": 2,
+    "Vampiro": 4,
+    "Explorador Goblin": 1,
+    "Guerreiro Orc": 3,
+    "Dragão Filhote": 3,
+    "Elemental de Fogo": 4,
+    "Elemental de Água": 5,
+    "Golem de Pedra": 6
+}
+
 
 jogador1 = Jogador("Jogador", eh_humano=True)
 jogador2 = Jogador("Máquina", eh_humano=False)
