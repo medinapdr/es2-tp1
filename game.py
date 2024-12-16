@@ -534,8 +534,8 @@ CRIATURAS_DISPONIVEIS = {
 
 jogador1 = Jogador("Jogador", eh_humano=True)
 jogador2 = Jogador("Máquina", eh_humano=False)
-jogador1.baralho.extend([copy.deepcopy(carta) for carta in random.choices(cartas, k=20)])
-jogador2.baralho.extend([copy.deepcopy(carta) for carta in random.choices(cartas, k=20)])
+jogador1.baralho.extend([copy.deepcopy(carta) for carta in random.choices(cartas, k=30)])
+jogador2.baralho.extend([copy.deepcopy(carta) for carta in random.choices(cartas, k=30)])
 
 if __name__ == "__main__":
     jogo = Jogo([jogador1, jogador2])
