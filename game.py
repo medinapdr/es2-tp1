@@ -7,6 +7,11 @@ import time
 
 init(autoreset=True)  # Inicializa o colorama para compatibilidade entre plataformas
 
+@staticmethod
+def custom_sleep(duration: int):
+    if os.getenv("RUNNING_TESTS") != "1":
+        time.sleep(duration)
+        
 def limpar_tela():
     os.system('cls' if os.name == 'nt' else 'clear')
 
@@ -186,7 +191,7 @@ class Jogador:
             # Se o jogador alvo não tiver criaturas, ataca a saúde diretamente
             if not jogador_alvo.campo_de_batalha:
                 print(f"{self.nome}'s {atacante.nome} ataca {jogador_alvo.nome} diretamente.")
-                time.sleep(2)
+                custom_sleep(2)
                 jogador_alvo.receber_dano(atacante.poder)
                 if jogo:
                     jogo.historico.append(
@@ -208,7 +213,7 @@ class Jogador:
             print(
                 f"{self.nome}'s {atacante.nome} (Poder: {atacante.poder}, Resistência: {atacante.resistencia}) \n"
                 f"ataca {jogador_alvo.nome}'s {criatura_alvo.nome} (Poder: {criatura_alvo.poder}, Resistência: {criatura_alvo.resistencia}).")
-            time.sleep(2)
+            custom_sleep(2)
             
             # Aplica o dano à criatura escolhida
             if criatura_alvo.sofrer_dano(atacante.poder):
@@ -378,14 +383,14 @@ class Jogador:
 
         else:
             print(f"{self.nome} está escolhendo uma ação...")
-            time.sleep(2)
+            custom_sleep(2)
 
             # Se a saúde da IA estiver baixa, prioriza cura (se possível)
             if self.saude < 10:
                 for i, carta in  enumerate(self.mao):
                     if carta.custo_mana <= self.mana and isinstance(carta, CartaFeitico) and carta.tipo_magia == "cura":
                         print(f"{self.nome} decidiu se curar jogando {carta.nome}")
-                        time.sleep(2)
+                        custom_sleep(2)
                         self.jogar_carta(i, jogo=jogo)
                         return 
             
@@ -399,12 +404,12 @@ class Jogador:
                             criatura_alvo = min(jogador_alvo.campo_de_batalha, key=lambda c: c.resistencia)
                             indice_alvo = jogador_alvo.campo_de_batalha.index(criatura_alvo)
                             print(f"{self.nome} usa {carta.nome} na criatura inimiga {criatura_alvo.nome}")
-                            time.sleep(2)
+                            custom_sleep(2)
                             self.jogar_carta(i, alvo=criatura_alvo, jogador_alvo=jogador_alvo, jogo=jogo)
                         else:
                             # Se não tem alvo específico (dano_coletivo), só lança
                             print(f"{self.nome} usa {carta.nome} para danificar o campo inimigo.")
-                            time.sleep(2)
+                            custom_sleep(2)
                             self.jogar_carta(i, jogador_alvo=jogador_alvo, jogo=jogo)
                         return
                     
@@ -412,14 +417,14 @@ class Jogador:
             for i, carta in enumerate(self.mao):
                 if carta.custo_mana <= self.mana and isinstance(carta, CartaCriatura):
                     print(f"{self.nome} decide invocar a criatura {carta.nome}")
-                    time.sleep(2)
+                    custom_sleep(2)
                     self.jogar_carta(i, jogo=jogo)
                     return
             
             # Se não conseguiu jogar nada, ataca se tiver criaturas
             if self.campo_de_batalha:
                 print(f"{self.nome} decide atacar.")
-                time.sleep(2)
+                custom_sleep(2)
                 # Tenta atacar a criatura com menor resistência do oponente, senão o jogador
                 if jogador_alvo.campo_de_batalha:
                     criatura_alvo = min(jogador_alvo.campo_de_batalha, key=lambda c: c.resistencia)
@@ -435,7 +440,7 @@ class Jogador:
                 # Se não tem criaturas no campo e não pode jogar nada
                 print(f"{self.nome} não jogou cartas e nem atacou. Passando a vez...")
                 jogo.historico.append(f"Rodada {jogo.turno + 1} - {self.nome}: passou a vez")
-                time.sleep(2)
+                custom_sleep(2)
 
     def __str__(self):
         return f"Jogador {self.nome}: Saúde = {self.saude}, Mana = {self.mana}, Mão = {len(self.mao)}, Campo de Batalha = {len(self.campo_de_batalha)}"
@@ -533,8 +538,9 @@ jogador2 = Jogador("Máquina", eh_humano=False)
 jogador1.baralho.extend([copy.deepcopy(carta) for carta in random.choices(cartas, k=20)])
 jogador2.baralho.extend([copy.deepcopy(carta) for carta in random.choices(cartas, k=20)])
 
-jogo = Jogo([jogador1, jogador2])
-jogo.iniciar()
+if __name__ == "__main__":
+    jogo = Jogo([jogador1, jogador2])
+    jogo.iniciar()
 
-while jogo.jogar_turno():
-    pass
+    while jogo.jogar_turno():
+        pass
