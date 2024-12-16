@@ -7,7 +7,6 @@ import time
 
 init(autoreset=True)  # Inicializa o colorama para compatibilidade entre plataformas
 
-@staticmethod
 def custom_sleep(duration: int):
     if os.getenv("RUNNING_TESTS") != "1":
         time.sleep(duration)
