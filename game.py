@@ -1,9 +1,11 @@
 import random
 import copy
 import os
+import time
 from typing import List, Optional
 from colorama import Fore, Style, init
-import time
+from cartas import Carta, CartaCriatura, CartaFeitico, CartaFeiticoRevive, CartaTerreno, CartaAleatoria
+from banco_de_dados import BancoSimulado
 
 init(autoreset=True)  # Inicializa o colorama para compatibilidade entre plataformas
 
@@ -13,139 +15,6 @@ def custom_sleep(duration: int):
         
 def limpar_tela():
     os.system('cls' if os.name == 'nt' else 'clear')
-
-class Carta:
-    """Representa uma carta genérica."""
-    def __init__(self, nome: str, custo_mana: int, descricao: str, tipo_magia: Optional[str] = None):
-        self.nome = nome
-        self.custo_mana = custo_mana
-        self.descricao = descricao
-        self.tipo_magia = tipo_magia
-
-    def __str__(self):
-        return f"{self.nome} (Mana: {self.custo_mana}) - {self.descricao}"
-
-class CartaCriatura(Carta):
-    """Representa uma carta de criatura."""
-    def __init__(self, nome: str, custo_mana: int, descricao: str, poder: int, resistencia: int):
-        super().__init__(nome, custo_mana, descricao)
-        self.poder = poder
-        self.resistencia = resistencia
-
-    def __str__(self):
-        return f"{self.nome} (Mana: {self.custo_mana}) [Poder: {self.poder}, Resistência: {self.resistencia}] - {self.descricao}"
-    
-    def sofrer_dano(self, quantidade: int, jogador=None):
-        """Aplica dano à criatura e envia ao cemitério se a resistência for menor ou igual a zero."""
-        self.resistencia -= quantidade
-        print(f"{self.nome} sofre {quantidade} de dano. Resistência restante: {self.resistencia}")
-        if self.resistencia <= 0:
-            if jogador:
-                jogador.campo_de_batalha.remove(self)
-                jogador.cemiterio.append(self)
-                print(f"{self.nome} foi removida do campo de batalha e enviada ao cemitério.")
-            return True
-        return False
-
-class CartaFeitico(Carta):
-    """Representa uma carta de feitiço."""
-    def __init__(self, nome: str, custo_mana: int, descricao: str, tipo_magia: str, poder: int, tem_alvo: bool = False, afeta_todos: bool = False):
-        super().__init__(nome, custo_mana, descricao, tipo_magia)
-        self.poder = poder
-        self.tem_alvo = tem_alvo
-        self.afeta_todos = afeta_todos
-
-    def lancar(self, lancador, alvo=None, jogador_adversario=None):
-        """Lança o feitiço."""
-        if lancador.mana < self.custo_mana:
-            print(f"Mana insuficiente para lançar {self.nome}.")
-            return False
-        
-        lancador.mana -= self.custo_mana
-        
-        if self.tipo_magia == "dano_direto":
-            print(f"{lancador.nome} lança {self.nome} em {alvo.nome if alvo else 'o jogador adversário'}, causando {self.poder} de dano.")
-            alvo.receber_dano(self.poder) if hasattr(alvo, 'receber_dano') else print("Alvo inválido.")
-        
-        elif self.tipo_magia == "dano_unico":
-            if alvo and hasattr(alvo, 'sofrer_dano'):
-                print(f"{lancador.nome} lança {self.nome} em {alvo.nome}, causando {self.poder} de dano.")
-                alvo.sofrer_dano(self.poder, jogador_adversario)
-            elif alvo and hasattr(alvo, 'receber_dano'):
-                alvo.receber_dano(self.poder)
-
-        elif self.tipo_magia == "cura":
-            print(f"{lancador.nome} usa {self.nome} e restaura {self.poder} de saúde.")
-            lancador.saude += self.poder
-        
-        elif self.tipo_magia == "buff_coletivo":
-            print(f"{lancador.nome} usa {self.nome} para fortalecer suas criaturas.")
-            for criatura in lancador.campo_de_batalha:
-                criatura.resistencia += self.poder
-        
-        elif self.tipo_magia == "dano_coletivo" and jogador_adversario is not None:
-            print(f"{lancador.nome} lança {self.nome}, causando {self.poder} de dano a todas as criaturas do adversário.")
-            for criatura in jogador_adversario.campo_de_batalha[:]:
-                criatura.sofrer_dano(self.poder, jogador_adversario) 
-        return True
-    
-class CartaFeiticoRevive(CartaFeitico):
-    """Representa um feitiço que revive uma criatura do cemitério."""
-    def __init__(self, nome: str, custo_mana: int, descricao: str):
-        super().__init__(nome, custo_mana, descricao, tipo_magia="revive", poder=0, tem_alvo=False, afeta_todos=False)
-
-    def lancar(self, lancador, alvo=None, jogador_adversario=None):
-        """Lança o feitiço de reviver criatura."""
-        if lancador.mana < self.custo_mana:
-            print(f"Mana insuficiente para lançar {self.nome}.")
-            return False
-        lancador.mana -= self.custo_mana
-        criaturas_no_cemiterio = [c for c in lancador.cemiterio if isinstance(c, CartaCriatura)]
-        if criaturas_no_cemiterio:
-            criatura_para_revivir = random.choice(criaturas_no_cemiterio)
-            lancador.cemiterio.remove(criatura_para_revivir)
-            resistencia_original = CRIATURAS_DISPONIVEIS.get(criatura_para_revivir.nome, criatura_para_revivir.resistencia)
-            criatura_para_revivir.resistencia = resistencia_original
-            lancador.campo_de_batalha.append(criatura_para_revivir)
-            print(f"{lancador.nome} reviveu {criatura_para_revivir.nome} do cemitério!")
-        else:
-            print(f"{lancador.nome} tentou reviver uma criatura, mas não há nenhuma no cemitério.")
-
-        # O feitiço após ser lançado é consumido, será movido para o cemitério em jogar_carta
-        return True
-
-class CartaTerreno(Carta):
-    """Representa uma carta de terreno."""
-    def __init__(self, nome: str, descricao: str, efeito: str):
-        super().__init__(nome, custo_mana=0, descricao=descricao)
-        self.efeito = efeito
-
-    def ativar_efeito(self, jogador):
-        """Ativa o efeito do terreno."""
-        if self.efeito == "mana_extra":
-            jogador.mana += 1
-            print(f"{jogador.nome} ganha 1 mana extra devido ao efeito do terreno {self.nome}.")
-        elif self.efeito == "cura":
-            jogador.saude += 3
-            print(f"{jogador.nome} recupera 3 pontos de saúde devido ao efeito do terreno {self.nome}.")
-
-class CartaAleatoria(Carta):
-    """Representa uma carta com efeito aleatório."""
-    def __init__(self, nome: str, custo_mana: int, descricao: str, efeitos: List[str]):
-        super().__init__(nome, custo_mana, descricao)
-        self.efeitos = efeitos
-
-    def ativar_efeito(self, jogador, alvo=None):
-        """Ativa um efeito aleatório."""
-        self.efeito_atual = random.choice(self.efeitos)
-        print(f"{jogador.nome} ativa {self.nome} com efeito aleatório: {self.efeito_atual}.")
-        if self.efeito_atual == "dano":
-            if alvo:
-                alvo.receber_dano(3)
-        elif self.efeito_atual == "cura":
-            jogador.saude += 3
-        elif self.efeito_atual == "mana_extra":
-            jogador.mana += 1
 
 class Jogador:
     """Representa um jogador no jogo."""
@@ -187,9 +56,11 @@ class Jogador:
             print("Índice de carta inválido.")
             return False
         carta = self.mao[indice_carta]
+        
         if isinstance(carta, CartaFeiticoRevive) and not self.cemiterio:
             print(f"Não é possível utilizar {carta.nome} pois o cemitério está vazio!")
             return False
+        
         if isinstance(carta, CartaCriatura):
             if self.mana >= carta.custo_mana:
                 self.mana -= carta.custo_mana
@@ -219,12 +90,20 @@ class Jogador:
             return True
 
         elif isinstance(carta, CartaFeitico):
-            if carta.lancar(self, alvo, jogador_alvo):
-                self.cemiterio.append(self.mao.pop(indice_carta))
-                print(f"{self.nome} lançou {carta.nome}.")
-                if jogo:
-                    jogo.historico.append(f"Rodada {jogo.turno + 1} - {self.nome}: Usou {self.descricao_carta_para_historico(carta)}")
-                return True
+            if isinstance(carta, CartaFeiticoRevive):
+                if carta.lancar(self, CRIATURAS_DISPONIVEIS, alvo, jogador_alvo):
+                    self.cemiterio.append(self.mao.pop(indice_carta))
+                    print(f"{self.nome} lançou {carta.nome}.")
+                    if jogo:
+                        jogo.historico.append(f"Rodada {jogo.turno + 1} - {self.nome}: Usou {self.descricao_carta_para_historico(carta)}")
+                    return True
+            else:
+                if carta.lancar(self, alvo, jogador_alvo):
+                    self.cemiterio.append(self.mao.pop(indice_carta))
+                    print(f"{self.nome} lançou {carta.nome}.")
+                    if jogo:
+                        jogo.historico.append(f"Rodada {jogo.turno + 1} - {self.nome}: Usou {self.descricao_carta_para_historico(carta)}")
+                    return True
         return False
 
     def atacar(self, jogador_alvo, indice_atacante: int, indice_alvo: Optional[int] = None, jogo=None):
@@ -546,49 +425,9 @@ class Jogo:
             return False
         return True
     
-cartas = [
-    CartaCriatura("Guerreiro Esquelético", 1, "Um lutador esquelético.", 1, 1),
-    CartaCriatura("Esqueleto Gigante", 5, "Um esqueleto massivo com imensa força.", 5, 5),
-    CartaCriatura("Zumbi", 2, "Uma criatura morta-viva sem cérebro.", 2, 2),
-    CartaCriatura("Vampiro", 4, "Uma criatura sanguinária.", 3, 4),
-    CartaCriatura("Explorador Goblin", 1, "Um goblin sorrateiro.", 1, 1),
-    CartaCriatura("Guerreiro Orc", 3, "Um orc forte.", 4, 3),
-    CartaCriatura("Dragão Filhote", 2, "Um jovem dragão.", 2, 3),
-    CartaCriatura("Elemental de Fogo", 4, "Uma criatura de fogo.", 4, 4),
-    CartaCriatura("Elemental de Água", 4, "Uma criatura de água.", 3, 5),
-    CartaCriatura("Golem de Pedra", 6, "Um gigante feito de pedra.", 6, 6),
-    
-    CartaFeitico("Bola de Fogo", 3, "Causa 3 de dano a um alvo.", "dano_unico", 3, tem_alvo=True),
-    CartaFeitico("Raio", 2, "Causa 2 de dano a um alvo.", "dano_unico", 2, tem_alvo=True),
-    CartaFeitico("Explosão de Gelo", 4, "Causa 4 de dano ao oponente.", "dano_direto", 4),
-    CartaFeitico("Terremoto", 5, "Causa 5 de dano a todas as criaturas do oponente.", "dano_coletivo", 5, afeta_todos=True),
-    CartaFeitico("Escudo", 2, "Aumenta a resistência de todas as criaturas amigas em 1.", "buff_coletivo", 1),
-    CartaFeitico("Cura Menor", 1, "Restaura 2 de saúde.", "cura", 2),
-    CartaFeitico("Cura Média", 3, "Restaura 5 de saúde.", "cura", 5),
-    CartaFeitico("Cura Superior", 5, "Restaura 10 de saúde.", "cura", 10),
-
-    CartaFeiticoRevive("Necromante Sombrio", 0, "Revive uma criatura aleatória do cemitério."),
-
-    CartaTerreno("Floresta Encantada", "Um terreno que concede mana extra.", "mana_extra"),
-    CartaTerreno("Fonte da Vida", "Um terreno que cura o jogador.", "cura"),
-
-    CartaAleatoria("Caos Mágico", 3, "Ativa um efeito aleatório.", ["dano", "cura", "mana_extra"])
-]
-
-# Tabela de referência para as resistências originais das criaturas
-CRIATURAS_DISPONIVEIS = {
-    "Guerreiro Esquelético": 1,
-    "Esqueleto Gigante": 5,
-    "Zumbi": 2,
-    "Vampiro": 4,
-    "Explorador Goblin": 1,
-    "Guerreiro Orc": 3,
-    "Dragão Filhote": 3,
-    "Elemental de Fogo": 4,
-    "Elemental de Água": 5,
-    "Golem de Pedra": 6
-}
-
+banco = BancoSimulado('cartas_game.csv')
+cartas = banco.obter_cartas()
+CRIATURAS_DISPONIVEIS = {carta.nome: carta.resistencia for carta in cartas if isinstance(carta, CartaCriatura)}
 
 jogador1 = Jogador("Jogador", eh_humano=True)
 jogador2 = Jogador("Máquina", eh_humano=False)
