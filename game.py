@@ -114,6 +114,41 @@ class CartaFeiticoRevive(CartaFeitico):
         # O feitiço após ser lançado é consumido, será movido para o cemitério em jogar_carta
         return True
 
+class CartaTerreno(Carta):
+    """Representa uma carta de terreno."""
+    def __init__(self, nome: str, descricao: str, efeito: str):
+        super().__init__(nome, custo_mana=0, descricao=descricao)
+        self.efeito = efeito
+
+    def ativar_efeito(self, jogador):
+        """Ativa o efeito do terreno."""
+        if self.efeito == "mana_extra":
+            jogador.mana += 1
+            print(f"{jogador.nome} ganha 1 mana extra devido ao efeito do terreno {self.nome}.")
+        elif self.efeito == "cura":
+            jogador.saude += 3
+            print(f"{jogador.nome} recupera 3 pontos de saúde devido ao efeito do terreno {self.nome}.")
+
+class CartaAleatoria(Carta):
+    """Representa uma carta com efeito aleatório."""
+    def __init__(self, nome: str, custo_mana: int, descricao: str, efeitos: List[str]):
+        super().__init__(nome, custo_mana, descricao)
+        self.efeitos = efeitos
+
+    def ativar_efeito(self, jogador, alvo=None):
+        """Ativa um efeito aleatório."""
+        self.efeito_atual = random.choice(self.efeitos)
+        print(f"{jogador.nome} ativa {self.nome} com efeito aleatório: {self.efeito_atual}.")
+        if self.efeito_atual == "dano":
+            if alvo:
+                alvo.receber_dano(3)
+        elif self.efeito_atual == "cura":
+            if alvo:
+                alvo.receber_dano(3)
+        elif self.efeito_atual == "mana_extra":
+            if alvo:
+                alvo.receber_dano(3)
+
 class Jogador:
     """Representa um jogador no jogo."""
     def __init__(self, nome: str, eh_humano: bool = True):
@@ -142,8 +177,11 @@ class Jogador:
             return f"{carta.nome} (Mana: {carta.custo_mana}, Poder: {carta.poder}, Resistência: {carta.resistencia})"
         elif isinstance(carta, CartaFeitico):
             return f"{carta.nome} (Mana: {carta.custo_mana}, Tipo: {carta.tipo_magia}, Poder: {carta.poder})"
-        else:
-            return carta.nome
+        elif isinstance(carta, CartaTerreno):
+            return f"{carta.nome} (Terreno: {carta.descricao})"
+        elif isinstance(carta, CartaAleatoria):
+            return f"{carta.nome} (Mana: {carta.custo_mana}, Efeito: {carta.efeito_atual})"
+        return carta.nome
 
     def jogar_carta(self, indice_carta: int, alvo=None, jogador_alvo=None, jogo=None):
         """Joga uma carta da mão."""
@@ -165,6 +203,22 @@ class Jogador:
                 return True
             else:
                 print(f"Mana insuficiente para jogar {carta.nome}.")
+
+        if isinstance(carta, CartaTerreno):
+            print(f"{self.nome} joga o terreno {carta.nome}.")
+            carta.ativar_efeito(self)
+            self.mao.pop(indice_carta)
+            if jogo:
+                jogo.historico.append(f"Rodada {jogo.turno + 1} - {self.nome}: Jogou {self.descricao_carta_para_historico(carta)}")
+            return True
+
+        if isinstance(carta, CartaAleatoria):
+            print(f"{self.nome} joga {carta.nome}.")
+            carta.ativar_efeito(self, jogador_alvo)
+            self.mao.pop(indice_carta)
+            if jogo:
+                jogo.historico.append(f"Rodada {jogo.turno + 1} - {self.nome}: Jogou {self.descricao_carta_para_historico(carta)}")            
+            return True
 
         elif isinstance(carta, CartaFeitico):
             if carta.lancar(self, alvo, jogador_alvo):
@@ -190,7 +244,7 @@ class Jogador:
             # Se o jogador alvo não tiver criaturas, ataca a saúde diretamente
             if not jogador_alvo.campo_de_batalha:
                 print(f"{self.nome}'s {atacante.nome} ataca {jogador_alvo.nome} diretamente.")
-                custom_sleep(2)
+                custom_sleep(1.5)
                 jogador_alvo.receber_dano(atacante.poder)
                 if jogo:
                     jogo.historico.append(
@@ -212,7 +266,7 @@ class Jogador:
             print(
                 f"{self.nome}'s {atacante.nome} (Poder: {atacante.poder}, Resistência: {atacante.resistencia}) \n"
                 f"ataca {jogador_alvo.nome}'s {criatura_alvo.nome} (Poder: {criatura_alvo.poder}, Resistência: {criatura_alvo.resistencia}).")
-            custom_sleep(2)
+            custom_sleep(1.5)
             
             # Aplica o dano à criatura escolhida
             if criatura_alvo.sofrer_dano(atacante.poder):
@@ -286,6 +340,7 @@ class Jogador:
                     alvo = None
                     
                     if isinstance(carta, CartaFeitico) and carta.tem_alvo:
+                           
                         if jogador_alvo.campo_de_batalha:
                             print(f"Criaturas de {jogador_alvo.nome}:")
                             for i, criatura in enumerate(jogador_alvo.campo_de_batalha):
@@ -382,14 +437,14 @@ class Jogador:
 
         else:
             print(f"{self.nome} está escolhendo uma ação...")
-            custom_sleep(2)
+            custom_sleep(1.5)
 
             # Se a saúde da IA estiver baixa, prioriza cura (se possível)
             if self.saude < 10:
                 for i, carta in  enumerate(self.mao):
                     if carta.custo_mana <= self.mana and isinstance(carta, CartaFeitico) and carta.tipo_magia == "cura":
                         print(f"{self.nome} decidiu se curar jogando {carta.nome}")
-                        custom_sleep(2)
+                        custom_sleep(1.5)
                         self.jogar_carta(i, jogo=jogo)
                         return 
             
@@ -403,12 +458,12 @@ class Jogador:
                             criatura_alvo = min(jogador_alvo.campo_de_batalha, key=lambda c: c.resistencia)
                             indice_alvo = jogador_alvo.campo_de_batalha.index(criatura_alvo)
                             print(f"{self.nome} usa {carta.nome} na criatura inimiga {criatura_alvo.nome}")
-                            custom_sleep(2)
+                            custom_sleep(1.5)
                             self.jogar_carta(i, alvo=criatura_alvo, jogador_alvo=jogador_alvo, jogo=jogo)
                         else:
                             # Se não tem alvo específico (dano_coletivo), só lança
                             print(f"{self.nome} usa {carta.nome} para danificar o campo inimigo.")
-                            custom_sleep(2)
+                            custom_sleep(1.5)
                             self.jogar_carta(i, jogador_alvo=jogador_alvo, jogo=jogo)
                         return
                     
@@ -416,14 +471,14 @@ class Jogador:
             for i, carta in enumerate(self.mao):
                 if carta.custo_mana <= self.mana and isinstance(carta, CartaCriatura):
                     print(f"{self.nome} decide invocar a criatura {carta.nome}")
-                    custom_sleep(2)
+                    custom_sleep(1.5)
                     self.jogar_carta(i, jogo=jogo)
                     return
             
             # Se não conseguiu jogar nada, ataca se tiver criaturas
             if self.campo_de_batalha:
                 print(f"{self.nome} decide atacar.")
-                custom_sleep(2)
+                custom_sleep(1.5)
                 # Tenta atacar a criatura com menor resistência do oponente, senão o jogador
                 if jogador_alvo.campo_de_batalha:
                     criatura_alvo = min(jogador_alvo.campo_de_batalha, key=lambda c: c.resistencia)
@@ -439,7 +494,7 @@ class Jogador:
                 # Se não tem criaturas no campo e não pode jogar nada
                 print(f"{self.nome} não jogou cartas e nem atacou. Passando a vez...")
                 jogo.historico.append(f"Rodada {jogo.turno + 1} - {self.nome}: passou a vez")
-                custom_sleep(2)
+                custom_sleep(1.5)
 
     def __str__(self):
         return f"Jogador {self.nome}: Saúde = {self.saude}, Mana = {self.mana}, Mão = {len(self.mao)}, Campo de Batalha = {len(self.campo_de_batalha)}"
@@ -514,7 +569,12 @@ cartas = [
     CartaFeitico("Cura Média", 3, "Restaura 5 de saúde.", "cura", 5),
     CartaFeitico("Cura Superior", 5, "Restaura 10 de saúde.", "cura", 10),
 
-    CartaFeiticoRevive("Necromante Sombrio", 0, "Revive uma criatura aleatória do cemitério.")
+    CartaFeiticoRevive("Necromante Sombrio", 0, "Revive uma criatura aleatória do cemitério."),
+
+    CartaTerreno("Floresta Encantada", "Um terreno que concede mana extra.", "mana_extra"),
+    CartaTerreno("Fonte da Vida", "Um terreno que cura o jogador.", "cura"),
+
+    CartaAleatoria("Caos Mágico", 3, "Ativa um efeito aleatório.", ["dano", "cura", "mana_extra"])
 ]
 
 # Tabela de referência para as resistências originais das criaturas
