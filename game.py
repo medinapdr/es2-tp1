@@ -143,11 +143,9 @@ class CartaAleatoria(Carta):
             if alvo:
                 alvo.receber_dano(3)
         elif self.efeito_atual == "cura":
-            if alvo:
-                alvo.receber_dano(3)
+            jogador.saude += 3
         elif self.efeito_atual == "mana_extra":
-            if alvo:
-                alvo.receber_dano(3)
+            jogador.mana += 1
 
 class Jogador:
     """Representa um jogador no jogo."""
