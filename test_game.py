@@ -1,6 +1,8 @@
 import unittest
 import os
-from game import CartaCriatura, CartaFeitico, CartaFeiticoRevive, CartaTerreno, CartaAleatoria, Jogador
+from cartas import CartaCriatura, CartaFeitico, CartaFeiticoRevive, CartaTerreno, CartaAleatoria
+from jogador import Jogador
+
 
 class TestGame(unittest.TestCase):
     def setUp(self):
