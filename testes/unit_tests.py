@@ -1,10 +1,10 @@
 import unittest
 import os
-from cartas import CartaCriatura, CartaFeitico, CartaFeiticoRevive, CartaTerreno, CartaAleatoria
+from banco.cartas import CartaCriatura, CartaFeitico, CartaFeiticoRevive, CartaTerreno, CartaAleatoria
 from jogador import Jogador
 
 
-class TestGame(unittest.TestCase):
+class UnitTests(unittest.TestCase):
     def setUp(self):
         os.environ["RUNNING_TESTS"] = "1"
         self.jogador1 = Jogador("Jogador 1")

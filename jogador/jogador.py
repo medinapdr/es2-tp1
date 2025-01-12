@@ -1,5 +1,5 @@
 from typing import List
-from cartas import Carta, CartaCriatura
+from banco.cartas import Carta, CartaCriatura
 from .jogador_acao import JogadorAcao
 from .jogador_combate import JogadorCombate
 from .jogador_tabuleiro import JogadorTabuleiro

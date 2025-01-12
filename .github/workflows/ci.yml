@@ -34,4 +34,5 @@ jobs:
 
     - name: Rodar os testes
       run: |
-        python -m unittest test_game.py  # Executa os testes do arquivo test_game.py
+        python -m unittest unit_tests.py  # Executa os testes de unidade
+        python -m unittest e2e_tests.py # Executa os testes de sistema / integração

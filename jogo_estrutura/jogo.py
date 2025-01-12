@@ -1,5 +1,5 @@
 import random
-import utils
+import jogo_estrutura.utils as utils
 from typing import List
 
 class Jogo:

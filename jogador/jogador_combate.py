@@ -1,6 +1,6 @@
 from typing import Optional
-from cartas import CartaCriatura
-import utils
+from banco.cartas import CartaCriatura
+import jogo_estrutura.utils as utils
 
 class JogadorCombate:
     """Métodos relacionados ao combate do jogador."""

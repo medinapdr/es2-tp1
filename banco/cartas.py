@@ -154,4 +154,4 @@ class CartaAleatoria(Carta):
         elif self.efeito_atual == "cura":
             jogador.saude += 3
         elif self.efeito_atual == "mana_extra":
-            jogador.mana += 1
+            jogador.mana += 4

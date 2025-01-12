@@ -1,7 +1,7 @@
 import random
 import copy
-from banco_de_dados import BancoSimulado
-from  jogo import Jogo
+from banco.banco_de_dados import BancoSimulado
+from  jogo_estrutura.jogo import Jogo
 from  jogador import Jogador
     
 banco = BancoSimulado('cartas_game.csv')

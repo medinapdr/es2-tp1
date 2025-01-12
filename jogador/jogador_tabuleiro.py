@@ -86,7 +86,7 @@ class JogadorTabuleiro:
         else:
             print(f"{self.nome} está escolhendo uma ação...")
             # Lógica simplificada para IA
-            import utils
+            import jogo_estrutura.utils as utils
             utils.custom_sleep(1.5)
             # Exemplo: se tiver carta para jogar, jogar a primeira
             if self.mao and self.mana >= self.mao[0].custo_mana:

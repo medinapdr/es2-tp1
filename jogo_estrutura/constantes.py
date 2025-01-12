@@ -1,5 +1,5 @@
-from cartas import CartaCriatura
-from banco_de_dados import BancoSimulado
+from banco.cartas import CartaCriatura
+from banco.banco_de_dados import BancoSimulado
 
 # Carrega cartas do banco
 banco = BancoSimulado('cartas_game.csv')

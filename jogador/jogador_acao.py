@@ -1,5 +1,5 @@
-from cartas import Carta, CartaCriatura, CartaFeitico, CartaFeiticoRevive, CartaTerreno, CartaAleatoria
-from constantes import CRIATURAS_DISPONIVEIS
+from banco.cartas import Carta, CartaCriatura, CartaFeitico, CartaFeiticoRevive, CartaTerreno, CartaAleatoria
+from jogo_estrutura.constantes import CRIATURAS_DISPONIVEIS
 
 class JogadorAcao:
     """Define as ações de cartas que um jogador pode realizar."""
