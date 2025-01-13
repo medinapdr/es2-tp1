@@ -1,202 +1,116 @@
 import unittest
-from unittest.mock import patch
-import io
+import copy
+import random
 import os
 
-from jogador.jogador_tabuleiro import JogadorTabuleiro
-
-# DummyCarta para simular uma carta com o atributo 'custo_mana'
-class DummyCarta:
-    def __init__(self, nome, custo_mana=1):
-        self.nome = nome
-        self.custo_mana = custo_mana
-    def __str__(self):
-        return self.nome
-
-# Classe dummy que herda de JogadorTabuleiro
-class DummyJogador(JogadorTabuleiro):
-    def __init__(self, nome):
-        self.nome = nome
-        self.saude = 20
-        self.mana = 3
-        self.mao = []
-        self.campo_de_batalha = []
-        self.eh_humano = True
-        self.cemiterio = []  
-
-    def jogar_carta(self, indice_carta, **kwargs):
-        if 0 <= indice_carta < len(self.mao):
-            carta = self.mao.pop(indice_carta)
-            print(f"{self.nome} jogou {carta}.")
-            jogo = kwargs.get('jogo')
-            if jogo is not None:
-                # Atualiza o histórico para simular que a ação foi registrada
-                jogo.historico.append(f"Rodada {jogo.turno + 1} - {self.nome}: Jogou {carta}.")
-            return True
-        return False
-
-    def atacar(self, jogador_alvo, indice_atacante, indice_alvo=None, jogo=None):
-        print(f"{self.nome} atacou {jogador_alvo.nome} com sua criatura {indice_atacante}.")
-        if jogo is not None:
-            jogo.historico.append(f"Rodada {jogo.turno + 1} - {self.nome}: Atacou.")
-
-    def mostrar_cemiterio(self):
-        print("Cemitério de", self.nome, ":", self.cemiterio)
-
-# Classe dummy para simular o objeto do jogo
-class DummyJogo:
-    def __init__(self):
-        self.turno = 0
-        self.historico = []
-        self.encerrar_jogo = False
-
-####################################
-# Testes de Sistema / E2E
-####################################
-class E2ETests(unittest.TestCase):
-    def setUp(self):
-        self.jogador1 = DummyJogador("Jogador 1")
-        self.jogador2 = DummyJogador("Jogador 2")
-        self.jogo = DummyJogo()
-
-    def test_rodada_completa(self):
-        """
-        Simula uma rodada completa de interação com a interface:
-        - Jogador 1 (humano) deve escolher jogar uma carta.
-        - Em seguida, em outra ação, ele ataca.
-        - O teste verifica se o histórico foi atualizado e se as saídas  refletem a sequência correta de ações.
-        """
-        # Prepara a mão com duas cartas dummy: uma para jogar e outra para atacar
-        self.jogador1.mao = [DummyCarta("Carta Dummy Jogar", custo_mana=1),
-                              DummyCarta("Carta Dummy Atacar", custo_mana=1)]
-        
-        self.jogador1.campo_de_batalha = [DummyCarta("Criatura Dummy")]
-        self.jogador2.campo_de_batalha = [DummyCarta("Criatura Dummy Oponente")]
-
-        # Simula uma sequência de entradas:
-        # Primeiro, Jogador 1 escolhe a opção "1" para jogar carta, e então escolhe o índice "0"
-        # Depois, o jogador escolhe "2" para atacar e "0" para selecionar o atacante.
-        entradas = ["1", "0", "2", "0"]
-        with patch('builtins.input', side_effect=entradas), \
-             patch('sys.stdout', new_callable=io.StringIO) as fake_out:
-            # Primeira parte: jogar carta
-            self.jogador1.escolher_acao(self.jogador2, self.jogo)
-            # Incrementa o turno e simula nova ação (ataque)
-            self.jogo.turno += 1
-            self.jogador1.escolher_acao(self.jogador2, self.jogo)
-            output = fake_out.getvalue()
-
-            # Verifica se as mensagens indicam que a carta foi jogada e a ação de ataque ocorreu
-            self.assertIn("Jogador 1 jogou Carta Dummy Jogar.", output)
-            self.assertIn("atacou", output)
-            # Também verifica se o histórico foi atualizado em ambos os turnos
-            self.assertGreater(len(self.jogo.historico), 0)
-
-    def test_fluxo_completo_multiplos_turnos(self):
-        """
-        Simula um fluxo mais longo (vários turnos) que inclui:
-        - Jogador 1 joga uma carta.
-        - Jogador 1 ataca o jogador 2.
-        - Em um segundo turno, Jogador 2 (IA) joga uma carta.
-        - O teste verifica se, ao final, as ações dos dois jogadores foram registradas e se a interação (exibição do tabuleiro, histórico) ocorre conforme o esperado.
-        """
-        # Configura mãos e campos
-        self.jogador1.mao = [DummyCarta("Carta Dummy Jogar", custo_mana=2)]
-        self.jogador2.mao = [DummyCarta("Carta Dummy IA", custo_mana=1)]
-        self.jogador1.campo_de_batalha = [DummyCarta("Criatura Dummy 1")]
-        self.jogador2.campo_de_batalha = [DummyCarta("Criatura Dummy 2")]
-
-        # Para jogador 1 (humano), simula: jogar carta (opção 1) e depois atacar (opção 2)
-        entradas_jogador1 = ["1", "0", "2", "0"]
-        # Para jogador 2 (IA), simula o comportamento automático (não-humano)
-        self.jogador2.eh_humano = False
-
-        # Cria uma lista de inputs combinada: primeiro turno do jogador 1; depois, o turno do jogador 2.
-        # Como cada chamada a escolher_acao usa input, forneçemos a sequência completa.
-        entradas = entradas_jogador1  # para jogador 1
-        with patch('builtins.input', side_effect=entradas), \
-             patch('sys.stdout', new_callable=io.StringIO) as fake_out:
-            # Turno 1: Jogador 1 realiza suas ações
-            self.jogador1.escolher_acao(self.jogador2, self.jogo)
-            # Atualiza o turno para simular que o turno do jogador 1 acabou
-            self.jogo.turno += 1
-
-            # Turno 2: Jogador 2, não-humano, executa automaticamente
-            self.jogador2.escolher_acao(self.jogador1, self.jogo)
-            output = fake_out.getvalue()
-
-            # Verifica se o histórico contém ações dos dois turnos
-            self.assertGreaterEqual(len(self.jogo.historico), 1)
-            self.assertIn("Jogador 1", output)
-            self.assertIn("está escolhendo uma ação", output)  # para o jogador não-humano
-            # Verifica se as ações (como "jogou" ou "atacou") aparecem na saída
-            self.assertTrue("jogou" in output or "atacou" in output)
-
-    def test_escolher_acao_jogador_nao_humano(self):
-        """
-        Simula a ação automática para um jogador não humano.
-        """
-        self.jogador1.eh_humano = False
-        self.jogador1.mao = [DummyCarta("Carta Dummy IA", custo_mana=1)]
-        with patch('sys.stdout', new_callable=io.StringIO) as fake_out:
-            self.jogador1.escolher_acao(self.jogador2, self.jogo)
-            output = fake_out.getvalue()
-            self.assertIn("está escolhendo uma ação", output)
-
-# ---------------------------------------------------
-# Testes de Integração para a API do BancoSimulado
-# ---------------------------------------------------
 from banco.banco_de_dados import BancoSimulado
+from jogo_estrutura.jogo import Jogo
+from jogador import Jogador
 from banco.cartas import CartaCriatura
 
-class BancoSimuladoIntegrationTests(unittest.TestCase):
-    def setUp(self):
-        test_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(test_dir)
-        csv_path = os.path.join(project_root, "banco", "cartas_game.csv")
-        
-        with open(csv_path, encoding="utf-8") as f:
-            self.csv_content = f.read()
-        
-        patcher = patch('builtins.open', return_value=io.StringIO(self.csv_content))
-        self.addCleanup(patcher.stop)
-        self.mock_open = patcher.start()
-        
-        self.banco = BancoSimulado("cartas_game.csv")
+os.environ["RUNNING_TESTS"] = "1" # Configura a variável de ambiente para desabilitar o sleep durante os testes.
 
-    def test_buscar_cartas_por_tipo(self):
-        """Testa se buscar_cartas_por_tipo retorna apenas cartas do tipo 'CartaCriatura'."""
-        criaturas = self.banco.buscar_cartas_por_tipo("CartaCriatura")
-        self.assertGreater(len(criaturas), 0)
-        for carta in criaturas:
-            self.assertEqual(carta.__class__.__name__, "CartaCriatura")
-    
-    def test_adicionar_remover_atualizar(self):
-        """
-        Testa se:
-          - É possível adicionar uma carta,
-          - Removê-la pelo nome,
-          - Atualizar uma carta existente.
-        """
-        # Cria uma nova carta dummy (por exemplo, do tipo CartaCriatura)
-        nova_carta = CartaCriatura("Teste", 1, "Carta de teste", 1, 1)
-        # Testa a adição
-        adicionada = self.banco.adicionar_carta(nova_carta)
-        self.assertIn(nova_carta, self.banco.obter_cartas())
-        
-        # Testa a remoção
-        removidas = self.banco.remover_cartas_por_nome("Teste")
-        self.assertEqual(removidas, 1)
-        self.assertNotIn(nova_carta, self.banco.obter_cartas())
+class TesteIntegracaoE2E(unittest.TestCase):
 
-        # Testa a atualização: busque uma carta já existente (por exemplo, "Raio") e atualize seu custo_mana
-        atualizado = self.banco.atualizar_carta("Raio", custo_mana=5)
-        self.assertTrue(atualizado)
-        # Verifica se a atualização ocorreu
-        for carta in self.banco.obter_cartas():
-            if carta.nome == "Raio":
-                self.assertEqual(carta.custo_mana, 5)
+    @classmethod
+    def setUpClass(cls):
+        cls.banco = BancoSimulado('cartas_game.csv')
+        cls.cartas = cls.banco.obter_cartas()
+
+    def criar_jogadores(self, eh_humano=False):
+        """
+        Cria dois jogadores e adiciona cartas aleatórias aos seus baralhos.
+        Para os testes, os jogadores serão configurados como não-humanos (para evitar input).
+        """
+        jogador1 = Jogador("Jogador1", eh_humano=eh_humano)
+        jogador2 = Jogador("Jogador2", eh_humano=eh_humano)
+        # Para os testes, usamos um número menor de cartas
+        jogador1.baralho.extend([copy.deepcopy(carta) for carta in random.choices(self.cartas, k=10)])
+        jogador2.baralho.extend([copy.deepcopy(carta) for carta in random.choices(self.cartas, k=10)])
+        return jogador1, jogador2
+
+    def test_iniciar_jogo(self):
+        """Teste 1 - Verifica se, ao iniciar o jogo, cada jogador recebe 3 cartas na mão."""
+        jogador1, jogador2 = self.criar_jogadores()
+        jogo = Jogo([jogador1, jogador2])
+        jogo.iniciar()
+        self.assertEqual(len(jogador1.mao), 3, "Jogador1 deveria ter 3 cartas na mão após iniciar o jogo.")
+        self.assertEqual(len(jogador2.mao), 3, "Jogador2 deveria ter 3 cartas na mão após iniciar o jogo.")
+
+    def test_jogar_carta_creature(self):
+        """Teste 2 - Verifica se uma carta de criatura é jogada corretamente:
+           - A mana é descontada.
+           - A carta é removida da mão e adicionada ao campo de batalha.
+        """
+        jogador1, _ = self.criar_jogadores()       
+        # Cria uma criatura com custo 1, poder 2 e resistência 2
+        criatura = CartaCriatura("TestCreature", 1, "Criatura para teste", 2, 2)
+        # Sobrescreve a mão com somente essa carta e garante mana suficiente
+        jogador1.mao = [criatura]
+        jogador1.mana = 3
+
+        sucesso = jogador1.jogar_carta(0, jogo=None)
+        self.assertTrue(sucesso)
+        self.assertEqual(len(jogador1.campo_de_batalha), 1)
+        self.assertEqual(jogador1.mana, 2)
+
+    def test_atacar_direto(self):
+        """Teste 3 - Verifica se uma criatura ataca diretamente o jogador adversário quando este não possui criaturas,
+        causando o dano equivalente ao poder da criatura.
+        """
+        jogador1, jogador2 = self.criar_jogadores()
+        from banco.cartas import CartaCriatura
+        # Adiciona uma criatura com poder 3 ao campo do jogador1
+        atacante = CartaCriatura("Attacker", 1, "Criatura atacante para teste", 3, 3)
+        jogador1.campo_de_batalha.append(atacante)
+        saude_inicial = jogador2.saude
+
+        # Executa o ataque. Como jogador2 não possui criaturas, o ataque é direto.
+        jogador1.atacar(jogador2, indice_atacante=0, jogo=None)
+        self.assertEqual(jogador2.saude, saude_inicial - 3)
+
+    def test_feitico_cura(self):
+        """Teste 4 - Verifica se uma carta de feitiço de cura aplica o efeito corretamente, aumentando a saúde do jogador.
+        
+        O teste busca uma carta de feitiço com 'tipo_magia' igual a 'cura' e simula sua jogada.
+        """
+        jogador1, _ = self.criar_jogadores()
+        # Procura uma carta de feitiço de cura entre as cartas do banco
+        healing = None
+        for c in self.cartas:
+            if c.__class__.__name__ == "CartaFeitico" and getattr(c, 'tipo_magia', None) == "cura":
+                healing = copy.deepcopy(c)
                 break
+        self.assertIsNotNone(healing)
+
+        # Configura o cenário para o teste
+        jogador1.mao = [healing]
+        jogador1.mana = healing.custo_mana  # Garante mana suficiente
+        jogador1.saude = 10
+
+        sucesso = jogador1.jogar_carta(0, jogo=None)
+        self.assertTrue(sucesso)
+        self.assertEqual(jogador1.saude, 10 + healing.poder)
+
+    def test_game_end(self):
+        """Teste 5 - Verifica se o jogo termina quando um jogador é derrotado.
+        
+        O teste simula um cenário em que o jogador adversário tem saúde muito baixa e é atingido por uma criatura que
+        causa dano suficiente para reduzi-la a 0 ou menos.
+        """
+        jogador1, jogador2 = self.criar_jogadores()
+        # Ajusta a saúde do jogador2 para um valor baixo
+        jogador2.saude = 1
+        from banco.cartas import CartaCriatura
+        # Cria uma criatura com dano superior à saúde atual do adversário
+        atacante = CartaCriatura("StrongCreature", 1, "Criatura com dano alto para teste", 4, 4)
+        jogador1.campo_de_batalha.append(atacante)
+        jogo = Jogo([jogador1, jogador2])
+
+        # Realiza o ataque direto (já que o adversário não possui criaturas no campo)
+        jogador1.atacar(jogador2, indice_atacante=0, jogo=jogo)
+
+        self.assertTrue(jogador2.saude <= 0)
 
 if __name__ == '__main__':
     unittest.main()

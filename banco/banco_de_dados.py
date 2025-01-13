@@ -29,35 +29,3 @@ class BancoSimulado:
     def obter_cartas(self):
         return self.cartas
     
-    def buscar_cartas_por_tipo(self, tipo: str):
-        """Retorna todas as cartas cujo nome da classe seja igual ao valor informado."""
-        return [carta for carta in self.cartas if carta.__class__.__name__ == tipo]
-
-    def contar_cartas(self):
-        """Retorna o total de cartas carregadas."""
-        return len(self.cartas)
-
-    def adicionar_carta(self, carta):
-        """Adiciona uma carta à coleção e retorna-a."""
-        self.cartas.append(carta)
-        return carta
-
-    def remover_cartas_por_nome(self, nome: str):
-        """Remove todas as cartas com o nome informado e retorna a quantidade removida."""
-        removidas = [carta for carta in self.cartas if carta.nome == nome]
-        self.cartas = [carta for carta in self.cartas if carta.nome != nome]
-        return len(removidas)
-
-    def atualizar_carta(self, nome: str, **kwargs):
-        """
-        Atualiza atributos (ex.: custo_mana, descricao, tipo_magia, poder, resistencia)
-        da primeira carta encontrada cujo nome seja igual ao informado.
-        Retorna True se atualizou ou False se não encontrou.
-        """
-        for carta in self.cartas:
-            if carta.nome == nome:
-                for chave, valor in kwargs.items():
-                    if hasattr(carta, chave):
-                        setattr(carta, chave, valor)
-                return True
-        return False

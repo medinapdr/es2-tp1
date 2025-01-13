@@ -3,6 +3,7 @@ from banco.cartas import Carta, CartaCriatura
 from .jogador_acao import JogadorAcao
 from .jogador_combate import JogadorCombate
 from .jogador_tabuleiro import JogadorTabuleiro
+from .jogador_ia import JogadorIA
 
 class Jogador(JogadorAcao, JogadorCombate, JogadorTabuleiro):
     """
@@ -46,3 +47,10 @@ class Jogador(JogadorAcao, JogadorCombate, JogadorTabuleiro):
     def __str__(self):
         return (f"Jogador {self.nome}: Saúde = {self.saude}, Mana = {self.mana}, "
                 f"Mão = {len(self.mao)}, Campo = {len(self.campo_de_batalha)}")
+    
+    def escolher_acao(self, jogador_alvo, jogo):
+        if self.eh_humano:
+            super().escolher_acao(jogador_alvo, jogo)
+        else:
+            ia = JogadorIA(self)
+            ia.escolher_acao(jogador_alvo, jogo)
