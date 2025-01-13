@@ -29,3 +29,7 @@ class BancoSimulado:
     def obter_cartas(self):
         return self.cartas
     
+    def adicionar_carta(self, carta):
+        """Adiciona uma carta à coleção e retorna-a."""
+        self.cartas.append(carta)
+        return carta

@@ -35,4 +35,5 @@ jobs:
     - name: Rodar os testes
       run: |
         python -m unittest testes.unit_tests  # Executa os testes de unidade
-        python -m unittest testes.e2e_tests # Executa os testes de sistema / integração
+        python -m unittest testes.e2e_tests # Executa os testes de sistema 
+        python -m unittest testes.integration_tests # Executa os testes de integração

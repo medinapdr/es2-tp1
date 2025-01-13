@@ -44,17 +44,21 @@ class JogadorIA:
                 self.jogador.jogar_carta(i, jogo=jogo)
                 return
 
-        # Se tiver criatura no campo, tenta atacar
+        # Se tiver criatura no campo, tenta atacar com a de maior poder (maior dano)
         if self.jogador.campo_de_batalha:
-            print(f"{self.jogador.nome} decide atacar.")
+            # Seleciona a criatura com o maior poder
+            atacante = max(self.jogador.campo_de_batalha, key=lambda c: c.poder)
+            indice_atacante = self.jogador.campo_de_batalha.index(atacante)
+            print(f"{self.jogador.nome} decide atacar com {atacante.nome} (Poder: {atacante.poder}).")
             utils.custom_sleep(1.5)
             if jogador_alvo.campo_de_batalha:
+                # Se o adversário tiver criaturas, ataca aquela com menor resistência
                 criatura_alvo = min(jogador_alvo.campo_de_batalha, key=lambda c: c.resistencia)
-                indice_atacante = 0
                 indice_alvo = jogador_alvo.campo_de_batalha.index(criatura_alvo)
                 self.jogador.atacar(jogador_alvo, indice_atacante, indice_alvo, jogo=jogo)
             else:
-                self.jogador.atacar(jogador_alvo, 0, jogo=jogo)
+                # Ataque direto ao jogador adversário
+                self.jogador.atacar(jogador_alvo, indice_atacante, jogo=jogo)
             return
 
         # Se não houver nenhuma ação possível, passa a vez.
